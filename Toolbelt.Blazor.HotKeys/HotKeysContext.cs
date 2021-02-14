@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace Toolbelt.Blazor.HotKeys
@@ -19,15 +20,19 @@ namespace Toolbelt.Blazor.HotKeys
 
         private readonly Task AttachTask;
 
+        private readonly ILogger<HotKeys> Logger;
+
         /// <summary>
         /// Initialize a new instance of the HotKeysContext class.
         /// </summary>
         /// <param name="jSRuntime"></param>
         /// <param name="attachTask"></param>
-        internal HotKeysContext(IJSRuntime jSRuntime, Task attachTask)
+        /// <param name="logger"></param>
+        internal HotKeysContext(IJSRuntime jSRuntime, Task attachTask, ILogger<HotKeys> logger)
         {
             this.JSRuntime = jSRuntime;
             this.AttachTask = attachTask;
+            this.Logger = logger;
         }
 
         /// <summary>
@@ -163,6 +168,7 @@ namespace Toolbelt.Blazor.HotKeys
             hotKeyEntry.ObjectReference = DotNetObjectReference.Create(hotKeyEntry);
             this.AttachTask.ContinueWith(t =>
             {
+                if (t.IsFaulted) return Task.FromException<int>(t.Exception);
                 return this.JSRuntime.InvokeAsync<int>(
                     "Toolbelt.Blazor.HotKeys.register",
                     hotKeyEntry.ObjectReference, hotKeyEntry.ModKeys, hotKeyEntry.KeyName, hotKeyEntry.AllowIn).AsTask();
@@ -170,7 +176,12 @@ namespace Toolbelt.Blazor.HotKeys
             .Unwrap()
             .ContinueWith(t =>
             {
-                if (!t.IsCanceled && !t.IsFaulted) { hotKeyEntry.Id = t.Result; }
+                if (t.IsFaulted)
+                {
+                    var e = t.Exception is AggregateException ? t.Exception.InnerException : t.Exception;
+                    //if (!(e is InvalidOperationException)) this.Logger.LogError(e, e.Message);
+                }
+                else if (!t.IsCanceled) { hotKeyEntry.Id = t.Result; }
             });
             return hotKeyEntry;
         }

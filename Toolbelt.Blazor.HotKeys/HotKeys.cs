@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace Toolbelt.Blazor.HotKeys
@@ -16,6 +17,10 @@ namespace Toolbelt.Blazor.HotKeys
 
         private readonly IJSRuntime JSRuntime;
 
+        private readonly HotKeysOptions Options;
+
+        private readonly ILogger<HotKeys> Logger;
+
         private readonly SemaphoreSlim Syncer = new(1, 1);
 
         private readonly bool IsWasm = RuntimeInformation.OSDescription == "web" || RuntimeInformation.OSDescription == "Browser";
@@ -28,9 +33,11 @@ namespace Toolbelt.Blazor.HotKeys
         /// <summary>
         /// Initialize a new instance of the HotKeys class.
         /// </summary>
-        internal HotKeys(IJSRuntime jSRuntime)
+        internal HotKeys(IJSRuntime jSRuntime, HotKeysOptions options, ILogger<HotKeys> logger)
         {
             this.JSRuntime = jSRuntime;
+            this.Options = options;
+            this.Logger = logger;
         }
 
         /// <summary>
@@ -43,9 +50,14 @@ namespace Toolbelt.Blazor.HotKeys
             try
             {
                 if (_Attached) return;
-                var version = this.GetType().Assembly.GetName().Version;
-                var scriptPath = $"_content/Toolbelt.Blazor.HotKeys/script.min.js?v={version}";
-                await JSRuntime.InvokeVoidAsync("eval", "new Promise(r=>((d,t,s)=>(h=>h.querySelector(t+`[src=\"${{s}}\"]`)?r():(e=>(e.src=s,e.onload=r,h.appendChild(e)))(d.createElement(t)))(d.head))(document,'script','" + scriptPath + "'))");
+
+                if (this.Options.DisableClientScriptAutoInjection == false)
+                {
+                    var version = this.GetType().Assembly.GetName().Version;
+                    var scriptPath = $"_content/Toolbelt.Blazor.HotKeys/script.min.js?v={version}";
+                    await JSRuntime.InvokeVoidAsync("eval", "new Promise(r=>((d,t,s)=>(h=>h.querySelector(t+`[src=\"${{s}}\"]`)?r():(e=>(e.src=s,e.onload=r,h.appendChild(e)))(d.createElement(t)))(d.head))(document,'script','" + scriptPath + "'))");
+                }
+
                 await JSRuntime.InvokeVoidAsync("Toolbelt.Blazor.HotKeys.attach", DotNetObjectReference.Create(this), IsWasm);
                 _Attached = true;
             }
@@ -59,7 +71,7 @@ namespace Toolbelt.Blazor.HotKeys
         public HotKeysContext CreateContext()
         {
             var attachTask = Attach();
-            return new HotKeysContext(this.JSRuntime, attachTask);
+            return new HotKeysContext(this.JSRuntime, attachTask, this.Logger);
         }
 
         /// <summary>

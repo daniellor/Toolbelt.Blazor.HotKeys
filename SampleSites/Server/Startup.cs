@@ -26,7 +26,7 @@ namespace SampleSite.Server
             services.AddRazorPages();
             services.AddServerSideBlazor();
             services.AddScoped<IWeatherForecastService, WeatherForecastService>();
-            services.AddHotKeys();
+            services.AddHotKeys(options => { options.DisableClientScriptAutoInjection = true; });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
