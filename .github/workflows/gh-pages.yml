@@ -18,7 +18,7 @@ jobs:
         with:
           dotnet-version: 5.0.302
 
-      # Publish the site
+      # Publish the site1
       - name: Publish
         run: dotnet publish SampleSites/Client/SampleSite.Client.csproj -c Release -o public -p:GHPages=true
 
